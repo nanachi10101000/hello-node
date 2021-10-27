@@ -64,3 +64,5 @@ async function getData(stockCode, format, today) {
   }
 }
 getData(stockCode, format, today);
+ console.log("123");
+
