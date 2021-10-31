@@ -1,21 +1,29 @@
 const express = require("express");
 const path = require("path");
-let app = express(); // application
+require("dotenv").config();
 const mysql = require("mysql");
-require('dotenv').config();
 const Promise = require("bluebird");
 
 let connection = mysql.createConnection({
-  
-  host: process.env["DB_HOST"], // 本機 127.0.0.1
-  // port: 3306, // 埠號 mysql 預設就是 3306
-  user: process.env["DB_USER"],
-  password: process.env["DB_PASS"],
-  database: process.env["DB_DATABASE"],
+  host: process.env.DB_HOST, // 本機 127.0.0.1
+  port: process.env.DB_PORT, // 埠號 mysql 預設就是 3306
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_DATABASE,
 });
 
+// 利用 bluebird 把 connection 的函式都變成 promise
+connection = Promise.promisifyAll(connection);
 
-connection = Promise.promisifyAll(connection)
+let app = express(); // application
+
+// cors
+// https://www.npmjs.com/package/cors
+const cors = require("cors");
+// let corsOptions = {
+//   origin: "*", // 全部
+// };
+app.use(cors());
 
 app.use(express.static("static"));
 //localhost:3001/about.html
@@ -41,7 +49,6 @@ app.use((req, res, next) => {
   // next 可以讓他往下一關前進
   // 但是目前這個中間件「不需要」知道下一個知道
 });
-
 
 app.use((req, res, next) => {
   let current = new Date();
@@ -80,12 +87,40 @@ app.get("/member", (req, res) => {
   res.send("我是會員頁");
 });
 
+app.get("/api/test", (req, res) => {
+  res.json({
+    name: "ashley",
+    job: "engineer",
+  });
+});
+
+// 列表：全部資料
 app.get("/api/todos", async (req, res) => {
   let data = await connection.queryAsync("SELECT * FROM todos");
   res.json(data);
 });
 
-// 職責切割
+// /api/todos/24
+// 根據 id 取得單筆資料
+app.get("/api/todos/:todoId", async (req, res) => {
+  // req.params.todoId
+  let data = await connection.queryAsync("SELECT * FROM todos WHERE id = ?;", [
+    req.params.todoId,
+  ]);
+
+  // Ａ直接把陣列回給前端
+  // res.json(data);
+  if (data.length > 0) {
+    // Ｂ只回覆一個物件
+    res.json(data[0]);
+  } else {
+    // ? 空的
+    // /api/todos/44
+    // res.send(null);
+    res.status(404).send("Not Found");
+    // 都可以，但是團隊一致
+  }
+});
 
 // 這個中間件是負責做紀錄
 app.use((req, res, next) => {
@@ -101,7 +136,8 @@ app.use((req, res, next) => {
   res.status(404).send("Not Found");
 });
 
-// 3006 port
-app.listen(3006, () => {
+// 3001 port
+app.listen(3001, () => {
+  connection.connect();
   console.log("express app 啟動了喔");
 });
